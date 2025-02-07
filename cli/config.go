@@ -12,7 +12,7 @@ import (
 	"launchpad.net/goyaml"
 )
 
-//Yaml file keys
+// Yaml file keys
 const (
 	HOST         = "host"
 	PORT         = "port"
@@ -24,18 +24,19 @@ const (
 	TIMEOUT      = "timeout"
 	DEBUG        = "debug"
 	STARTING     = "starting"
+	USEDPAPP     = "use_dpapp"
 )
 
-//Other convinience constants
+// Other convinience constants
 const (
 	ERR_STR      = "Error parsing configuration: %v"
 	DEFAULT_FILE = "config.yml"
 )
 
-//Config is just a map
+// Config is just a map
 type Config map[string]interface{}
 
-//Default minimal configuration
+// Default minimal configuration
 var config = Config{
 
 	HOST:         "http://localhost",
@@ -48,9 +49,10 @@ var config = Config{
 	TIMEOUT:      10,
 	DEBUG:        false,
 	STARTING:     false,
+	USEDPAPP:     true, // try to launch the
 }
 
-//Config items descriptions
+// Config items descriptions
 var config_descriptions = map[string]string{
 
 	HOST:         "Pipeline's webservice host",
@@ -63,9 +65,10 @@ var config_descriptions = map[string]string{
 	TIMEOUT:      "Http connection timeout in seconds",
 	DEBUG:        "Print debug messages. true or false. ",
 	STARTING:     "Start the webservice in the local computer if it is not running. true or false",
+	USEDPAPP:     "Use the DAISY pipeline electron app if available. true or false",
 }
 
-//Makes a copy of the default config
+// Makes a copy of the default config
 func copyConf() Config {
 	ret := make(Config)
 	for k, v := range config {
@@ -74,8 +77,8 @@ func copyConf() Config {
 	return ret
 }
 
-//Tries to load the default configuration file ( folder where the executable is located / config.yml) if not possible
-//returns a minimal configuration setup
+// Tries to load the default configuration file ( folder where the executable is located / config.yml) if not possible
+// returns a minimal configuration setup
 func NewConfig() Config {
 	cnf := copyConf()
 	if err := loadDefault(cnf); err != nil {
@@ -86,7 +89,7 @@ func NewConfig() Config {
 	return cnf
 }
 
-//Loads the default configuration file
+// Loads the default configuration file
 func loadDefault(cnf Config) error {
 	folder, err := osext.ExecutableFolder()
 	if err != nil {
@@ -104,7 +107,7 @@ func loadDefault(cnf Config) error {
 	return nil
 }
 
-//Loads the contents of the yaml file into the configuration
+// Loads the contents of the yaml file into the configuration
 func (c Config) FromYaml(r io.Reader) error {
 	bytes, err := ioutil.ReadAll(r)
 	if err != nil {
@@ -118,8 +121,8 @@ func (c Config) FromYaml(r io.Reader) error {
 	return err
 }
 
-//This method should be called if the DEBUG configuration is changed. The internal Config methods
-//do this automatically
+// This method should be called if the DEBUG configuration is changed. The internal Config methods
+// do this automatically
 func (c Config) UpdateDebug() {
 	if !c[DEBUG].(bool) {
 		log.SetOutput(ioutil.Discard)
@@ -128,7 +131,7 @@ func (c Config) UpdateDebug() {
 	}
 }
 
-//Returns the Url composed by HOSTNAME:PORT/PATH/
+// Returns the Url composed by HOSTNAME:PORT/PATH/
 func (c Config) Url() string {
 	return fmt.Sprintf("%v:%v/%v/", c[HOST], c[PORT], c[PATH])
 }
