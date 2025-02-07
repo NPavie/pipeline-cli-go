@@ -5,10 +5,11 @@ import (
 	"io"
 	"log"
 	"os"
+	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"text/template"
-	"regexp"
 
 	"github.com/bertfrees/go-subcommand"
 )
@@ -122,23 +123,49 @@ func NewCli(name string, link *PipelineLink) (cli *Cli, err error) {
 	//initialise the link so we take into account the
 	//global configuration flags
 	cli.PostFlags(func() error {
-		if err = link.Init(); err != nil {
-			return err
-		}
-		scripts, err := link.Scripts()
-		if err != nil {
-			fmt.Printf("Error loading scripts:\n\t%v\n", err)
-			os.Exit(-1)
-		}
-		cli.AddScripts(scripts, link)
-		if !link.IsLocal() {
-			//it we are not in local mode we need to send the data
-			for _, cmd := range cli.Scripts {
-
-				cmd.addDataOption()
+		// Note from DAISY meeting
+		// dp2 launches pipeline-ui (if needed); dp2 calls pipeline-ui in "CLI" mode; pipeline-ui calls dp2 with the port info as an argument
+		// When port attribute is set, the cli tool should not try to start a pipeline instance
+		// and directly connect to pipeline instance for which the port is set on the command line
+		forwardToApp := link.config[USEDPAPP].(bool) && (runtime.GOOS == "darwin" || runtime.GOOS == "windows")
+		if forwardToApp {
+			args := os.Args[1:]
+			if len(os.Args) == 1 {
+				args = append(args, "help")
+			}
+			fmt.Println("Trying to launch Daisy Pipeline app")
+			if cmd, err := AppLauncher(args...); err == nil {
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					fmt.Printf("Could not use the pipeline app %v\nFallback to configured webservice\n", err)
+					forwardToApp = false
+				} else {
+					os.Exit(cmd.ProcessState.ExitCode())
+				}
+			} else {
+				fmt.Println("DAISY pipeline electron app is not installed, trying to launch the pipeline engine from settings")
+				forwardToApp = false
 			}
 		}
+		if !forwardToApp {
+			if err = link.Init(); err != nil {
+				return err
+			}
+			scripts, err := link.Scripts()
+			if err != nil {
+				fmt.Printf("Error loading scripts:\n\t%v\n", err)
+				os.Exit(-1)
+			}
+			cli.AddScripts(scripts, link)
+			if !link.IsLocal() {
+				//it we are not in local mode we need to send the data
+				for _, cmd := range cli.Scripts {
 
+					cmd.addDataOption()
+				}
+			}
+		}
 		return nil
 	})
 	//add config flags
