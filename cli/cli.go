@@ -133,18 +133,17 @@ func NewCli(name string, link *PipelineLink) (cli *Cli, err error) {
 			if len(os.Args) == 1 {
 				args = append(args, "help")
 			}
-			fmt.Println("Trying to launch Daisy Pipeline app")
 			if cmd, err := AppLauncher(args...); err == nil {
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
 				if err := cmd.Run(); err != nil {
-					fmt.Printf("Could not use the pipeline app %v\nFallback to configured webservice\n", err)
+					fmt.Printf("Could not use the pipeline app: %v\nFallback to configured webservice\n", err)
 					forwardToApp = false
 				} else {
 					os.Exit(cmd.ProcessState.ExitCode())
 				}
 			} else {
-				fmt.Println("DAISY pipeline electron app is not installed, trying to launch the pipeline engine from settings")
+				fmt.Println("DAISY pipeline electron app (1.7 or +) was not found in the PATH, trying to launch the pipeline engine from settings")
 				forwardToApp = false
 			}
 		}
