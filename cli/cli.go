@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"text/template"
@@ -19,8 +18,7 @@ const (
 )
 
 const (
-	MAIN_HELP_TEMPLATE = `
-Usage {{.Name}} [GLOBAL_OPTIONS] command [COMMAND_OPTIONS] [PARAMS]
+	MAIN_HELP_TEMPLATE = `Usage {{.Name}} [GLOBAL_OPTIONS] command [COMMAND_OPTIONS] [PARAMS]
 
 {{if .Scripts}}
 Script commands:
@@ -38,8 +36,7 @@ List of global options:                 {{.Name}} help -g
 List of admin commands:                 {{.Name}} help -a
 Detailed help for a single command:     {{.Name}} help COMMAND
 `
-	ADMIN_HELP_TEMPLATE = `
-Usage {{.Name}} [GLOBAL_OPTIONS] command [COMMAND_OPTIONS] [PARAMS]
+	ADMIN_HELP_TEMPLATE = `Usage {{.Name}} [GLOBAL_OPTIONS] command [COMMAND_OPTIONS] [PARAMS]
 
 Admin commands:
         {{range .AdminCommands}}{{commandAligner .Name}} {{.ShortDesc}}
@@ -48,8 +45,7 @@ Admin commands:
 List of global options:                 {{.Name}} help -g 
 Detailed help for a single command:     {{.Name}} help COMMAND
 `
-	COMMAND_HELP_TEMPLATE = `
-Usage: {{.Parent.Name}} [GLOBAL_OPTIONS] {{.Name}}{{if .MandatoryFlags}} REQUIRED_OPTIONS{{end}}{{if .MandatoryFlags}} [OPTIONS]{{end}} {{ .Arity.Description}}
+	COMMAND_HELP_TEMPLATE = `Usage: {{.Parent.Name}} [GLOBAL_OPTIONS] {{.Name}}{{if .MandatoryFlags}} REQUIRED_OPTIONS{{end}}{{if .MandatoryFlags}} [OPTIONS]{{end}} {{ .Arity.Description}}
 
 {{.LongDesc}}
 
@@ -66,8 +62,7 @@ Detailed help:                          {{.Parent.Name}} help --verbose {{.Name}
 {{end}}
 `
 
-	COMMAND_DETAILED_HELP_TEMPLATE = `
-Usage: {{.Parent.Name}} [GLOBAL_OPTIONS] {{.Name}}{{if .MandatoryFlags}} REQUIRED_OPTIONS{{end}}{{if .MandatoryFlags}} [OPTIONS]{{end}} {{ .Arity.Description}}
+	COMMAND_DETAILED_HELP_TEMPLATE = `Usage: {{.Parent.Name}} [GLOBAL_OPTIONS] {{.Name}}{{if .MandatoryFlags}} REQUIRED_OPTIONS{{end}}{{if .MandatoryFlags}} [OPTIONS]{{end}} {{ .Arity.Description}}
 
 {{.LongDesc}}
 
@@ -85,18 +80,17 @@ List of global options:       {{.Parent.Name}} help -g
 `
 
 	GLOBAL_OPTIONS_TEMPLATE = `
-
 Global Options:
 {{range .Flags }}       {{flagAligner .FlagStringPrefix}} {{.ShortDesc}}
 {{end}}
 
 `
 
-//{{range .Flags}}{{if len .Short}}-{{.Short}},{{end}}--{{.Long}}{{if isOption .}}   {{upper .Long}}{{end}}       {{.Description}}{{end}}
+// {{range .Flags}}{{if len .Short}}-{{.Short}},{{end}}--{{.Long}}{{if isOption .}}   {{upper .Long}}{{end}}       {{.Description}}{{end}}
 )
 
-//Cli is a subcommand that differenciates between script commands and regular commands just to treat them correctly during
-//the help display
+// Cli is a subcommand that differenciates between script commands and regular commands just to treat them correctly during
+// the help display
 type Cli struct {
 	*subcommand.Parser
 	Scripts        []*ScriptCommand      //pipeline scripts
@@ -105,13 +99,13 @@ type Cli struct {
 	Output         io.Writer             //writer where to dump the output
 }
 
-//Script commands have a job request associated
+// Script commands have a job request associated
 type ScriptCommand struct {
 	*subcommand.Command
 	req *JobRequest
 }
 
-//Creates a new CLI with a name and pipeline link to perform queries
+// Creates a new CLI with a name and pipeline link to perform queries
 func NewCli(name string, link *PipelineLink) (cli *Cli, err error) {
 	cli = &Cli{
 		Parser: subcommand.NewParser(name),
@@ -123,46 +117,20 @@ func NewCli(name string, link *PipelineLink) (cli *Cli, err error) {
 	//initialise the link so we take into account the
 	//global configuration flags
 	cli.PostFlags(func() error {
-		// Note from DAISY meeting
-		// dp2 launches pipeline-ui (if needed); dp2 calls pipeline-ui in "CLI" mode; pipeline-ui calls dp2 with the port info as an argument
-		// When port attribute is set, the cli tool should not try to start a pipeline instance
-		// and directly connect to pipeline instance for which the port is set on the command line
-		forwardToApp := link.config[USEDPAPP].(bool) && (runtime.GOOS == "darwin" || runtime.GOOS == "windows")
-		if forwardToApp {
-			args := os.Args[1:]
-			if len(os.Args) == 1 {
-				args = append(args, "help")
-			}
-			if cmd, err := AppLauncher(args...); err == nil {
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				if err := cmd.Run(); err != nil {
-					fmt.Printf("Could not use the pipeline app: %v\nFallback to configured webservice\n", err)
-					forwardToApp = false
-				} else {
-					os.Exit(cmd.ProcessState.ExitCode())
-				}
-			} else {
-				fmt.Println("DAISY pipeline electron app (1.7 or +) was not found in the PATH, trying to launch the pipeline engine from settings")
-				forwardToApp = false
-			}
+		if err = link.Init(); err != nil {
+			return err
 		}
-		if !forwardToApp {
-			if err = link.Init(); err != nil {
-				return err
-			}
-			scripts, err := link.Scripts()
-			if err != nil {
-				fmt.Printf("Error loading scripts:\n\t%v\n", err)
-				os.Exit(-1)
-			}
-			cli.AddScripts(scripts, link)
-			if !link.IsLocal() {
-				//it we are not in local mode we need to send the data
-				for _, cmd := range cli.Scripts {
+		scripts, err := link.Scripts()
+		if err != nil {
+			fmt.Printf("Error loading scripts:\n\t%v\n", err)
+			os.Exit(-1)
+		}
+		cli.AddScripts(scripts, link)
+		if !link.IsLocal() {
+			//it we are not in local mode we need to send the data
+			for _, cmd := range cli.Scripts {
 
-					cmd.addDataOption()
-				}
+				cmd.addDataOption()
 			}
 		}
 		return nil
@@ -172,7 +140,7 @@ func NewCli(name string, link *PipelineLink) (cli *Cli, err error) {
 	return
 }
 
-//Sets the help function
+// Sets the help function
 func (c *Cli) setHelp() {
 	globals := false
 	admin := false
@@ -194,7 +162,7 @@ func (c *Cli) setHelp() {
 	})
 }
 
-//Adds the configuration global options to the parser
+// Adds the configuration global options to the parser
 func (c *Cli) addConfigOptions(conf Config) {
 	for option, desc := range config_descriptions {
 		c.AddOption(option, "", fmt.Sprintf("%v (default %v)", desc, conf[option]), "", "", func(optName string, value string) error {
@@ -235,28 +203,28 @@ func (c *Cli) addConfigOptions(conf Config) {
 	})
 }
 
-//Adds the command to the cli and stores the it into the scripts list
+// Adds the command to the cli and stores the it into the scripts list
 func (c *Cli) AddScriptCommand(name, shortDesc string, longDesc string, fn func(string, ...string) error, request *JobRequest) *subcommand.Command {
 	cmd := c.Parser.AddCommand(name, shortDesc, longDesc, fn)
 	c.Scripts = append(c.Scripts, &ScriptCommand{cmd, request})
 	return cmd
 }
 
-//Adds a static command to the cli and keeps track of it for the displaying the help
+// Adds a static command to the cli and keeps track of it for the displaying the help
 func (c *Cli) AddCommand(name, desc string, fn func(string, ...string) error) *subcommand.Command {
 	cmd := c.Parser.AddCommand(name, desc, "", fn)
 	c.StaticCommands = append(c.StaticCommands, cmd)
 	return cmd
 }
 
-//Adds admin related commands to the cli and keeps track of it for displaying help
+// Adds admin related commands to the cli and keeps track of it for displaying help
 func (c *Cli) AddAdminCommand(name, desc string, fn func(string, ...string) error) *subcommand.Command {
 	cmd := c.Parser.AddCommand(name, desc, "", fn)
 	c.AdminCommands = append(c.AdminCommands, cmd)
 	return cmd
 }
 
-//convinience function to gather all the command names
+// convinience function to gather all the command names
 func (c Cli) mergeCommands() []string {
 	names := make([]string, 0, len(c.StaticCommands)+len(c.Scripts))
 	for _, cmd := range c.StaticCommands {
@@ -269,7 +237,7 @@ func (c Cli) mergeCommands() []string {
 	return names
 }
 
-//convinience function to gather all the command names
+// convinience function to gather all the command names
 func flagsToStrings(flags []subcommand.Flag) []string {
 	names := make([]string, 0, len(flags))
 	for _, flag := range flags {
@@ -278,18 +246,18 @@ func flagsToStrings(flags []subcommand.Flag) []string {
 	return names
 }
 
-//Runs the client
+// Runs the client
 func (c *Cli) Run(args []string) error {
 	_, err := c.Parser.Parse(args)
 	return err
 }
 
-//Prints using the client output
+// Prints using the client output
 func (c *Cli) Printf(format string, vals ...interface{}) {
 	fmt.Fprintf(c.Output, format, vals...)
 }
 
-//prints the help
+// prints the help
 func printHelp(cli Cli, globals, admin, details bool, args ...string) error {
 	if globals {
 		funcMap := template.FuncMap{
