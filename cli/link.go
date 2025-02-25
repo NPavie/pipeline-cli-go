@@ -8,11 +8,11 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/daisy/pipeline-clientlib-go"
-	"golang.org/x/exp/slices"
 )
 
 const (
@@ -106,11 +106,7 @@ func bringUp(pLink *PipelineLink) error {
 				if len(os.Args) == 1 {
 					args = append(args, "help")
 				}
-				absPath, err := exec.LookPath(execpath)
-				if err != nil {
-					absPath = execpath
-				}
-				cmd := exec.Command(absPath, args...)
+				cmd := exec.Command(execpath, args...)
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
 				if err := cmd.Run(); err != nil {

@@ -6,7 +6,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"slices"
 
 	"github.com/kardianos/osext"
 	"launchpad.net/goyaml"
@@ -17,14 +20,11 @@ const (
 	HOST         = "host"
 	PORT         = "port"
 	PATH         = "ws_path"
-	WSTIMEUP     = "ws_timeup"
-	EXECLINE     = "exec_line"
+	APPPATH      = "app_path"
 	CLIENTKEY    = "client_key"
 	CLIENTSECRET = "client_secret"
-	TIMEOUT      = "timeout"
 	DEBUG        = "debug"
 	STARTING     = "starting"
-	USEDPAPP     = "use_dpapp"
 )
 
 // Other convinience constants
@@ -42,14 +42,11 @@ var config = Config{
 	HOST:         "http://localhost",
 	PORT:         8181,
 	PATH:         "ws",
-	WSTIMEUP:     25,
-	EXECLINE:     "",
+	APPPATH:      "DAISY Pipeline",
 	CLIENTKEY:    "",
 	CLIENTSECRET: "",
-	TIMEOUT:      10,
 	DEBUG:        false,
-	STARTING:     false,
-	USEDPAPP:     true, // try to launch the
+	STARTING:     true,
 }
 
 // Config items descriptions
@@ -58,14 +55,11 @@ var config_descriptions = map[string]string{
 	HOST:         "Pipeline's webservice host",
 	PORT:         "Pipeline's webserivce port",
 	PATH:         "Pipeline's webservice path, as in http://daisy.org:8181/path",
-	WSTIMEUP:     "Time to wait until the webserivce starts in seconds",
-	EXECLINE:     "Pipeline webserivice executable path",
+	APPPATH:      "DAISY Pipeline app executable path",
 	CLIENTKEY:    "Client key for authenticated requests",
 	CLIENTSECRET: "Client secrect for authenticated requests",
-	TIMEOUT:      "Http connection timeout in seconds",
 	DEBUG:        "Print debug messages. true or false. ",
 	STARTING:     "Start the webservice in the local computer if it is not running. true or false",
-	USEDPAPP:     "Use the DAISY pipeline electron app if available. true or false",
 }
 
 // Makes a copy of the default config
@@ -144,7 +138,27 @@ func (c Config) ExecPath() string {
 }
 
 func (c Config) buildPath(base string) string {
-	p := filepath.FromSlash(c[EXECLINE].(string))
+	execpath := c[APPPATH].(string)
+	// empty app path defaults to looking for DAISY Pipeline app in the PATH
+	if execpath == "" {
+		execpath = "DAISY Pipeline"
+	}
+
+	switch runtime.GOOS {
+	case "windows":
+		// on windows, check by its extension if the provided runner is a script
+		// or an executable, and add the .exe extension if it's not there
+		// (to handle default execpath value)
+		winExt := []string{".exe", ".bat", ".cmd", ".ps1"}
+		if !slices.Contains(winExt, execpath[len(execpath)-4:]) {
+			execpath += ".exe"
+		}
+	}
+	if path, _err := exec.LookPath(execpath); _err == nil {
+		// exec found in path, return the absolute path of the app
+		return filepath.FromSlash(path)
+	}
+	p := filepath.FromSlash(execpath)
 	if filepath.IsAbs(p) {
 		return p
 	} else {
