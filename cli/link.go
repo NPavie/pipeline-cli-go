@@ -94,6 +94,10 @@ func bringUp(pLink *PipelineLink) error {
 	var alive pipeline.Alive
 	var err error
 	defaultConf := copyConf()
+	// if no configuration is defined, use the default one
+	if pLink.config == nil {
+		pLink.config = defaultConf
+	}
 	host_configured := pLink.config[HOST] != nil && pLink.config[HOST].(string) != ""
 	port_configured := pLink.config[PORT] != nil && pLink.config[PORT].(int) != 0
 	path_configured := pLink.config[PATH] != nil && pLink.config[PATH].(string) != ""
