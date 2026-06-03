@@ -94,12 +94,24 @@ func bringUp(pLink *PipelineLink) error {
 	var alive pipeline.Alive
 	var err error
 	defaultConf := copyConf()
-	if !((pLink.config[HOST] == nil || pLink.config[HOST].(string) == "") &&
-		 (pLink.config[HOST] == nil || pLink.config[PORT].(int) == 0) &&
-		 (pLink.config[PATH] == nil || pLink.config[PATH].(string) == "")) {
-		// A webservice is configured to be used in loaded configuration either from
+	host_configured := pLink.config[HOST] != nil && pLink.config[HOST].(string) != ""
+	port_configured := pLink.config[PORT] != nil && pLink.config[PORT].(int) != 0
+	path_configured := pLink.config[PATH] != nil && pLink.config[PATH].(string) != ""
+	if host_configured || port_configured || path_configured {
+		// A webservice is at least partially configured to be used in loaded configuration either from
 		// - the user provided config (config file or command line)
 		// - The default webservice config, reinstated due to missing or incorrect app path
+		if !host_configured {
+			pLink.config[HOST] = defaultConf[HOST]
+		}
+		if !port_configured {
+			pLink.config[PORT] = defaultConf[PORT]
+		}
+		if !path_configured {
+			pLink.config[PATH] = defaultConf[PATH]
+		}
+		log.Printf("Trying to connect to the webservice at %s\n", pLink.config.Url())
+		pLink.pipeline.SetUrl(pLink.config.Url())
 		alive, err = pLink.pipeline.Alive()
 		if err != nil {
 			if pLink.config[STARTING] != nil && pLink.config[STARTING].(bool) {
