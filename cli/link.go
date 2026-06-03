@@ -93,6 +93,7 @@ func (p PipelineLink) IsLocal() bool {
 func bringUp(pLink *PipelineLink) error {
 	var alive pipeline.Alive
 	var err error
+	defaultConf := copyConf()
 	if !((pLink.config[HOST] == nil || pLink.config[HOST].(string) == "") &&
 		 (pLink.config[HOST] == nil || pLink.config[PORT].(int) == 0) &&
 		 (pLink.config[PATH] == nil || pLink.config[PATH].(string) == "")) {
@@ -123,6 +124,7 @@ func bringUp(pLink *PipelineLink) error {
 			}
 		}
 	} else {
+		log.Println("No webservice configured, trying to start the app if possible")
 		// No webservice configured from initial configuration checks
 		// Check if Pipeline app is running
 		processes, err := ps.Processes()
@@ -186,8 +188,10 @@ func bringUp(pLink *PipelineLink) error {
 					"could not locate the Pipeline app")
 			}
 		}
-		// fallback to default configuration
-		pLink.config = copyConf()
+		log.Println("No webservice specified and app start not set to true, trying to connect to the default webservice address")
+		pLink.config[HOST] = defaultConf[HOST]
+		pLink.config[PORT] = defaultConf[PORT]
+		pLink.config[PATH] = defaultConf[PATH]
 		pLink.pipeline.SetUrl(pLink.config.Url())
 		alive, err = pLink.pipeline.Alive()
 		if err != nil {
